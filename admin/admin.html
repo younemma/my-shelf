@@ -11,6 +11,7 @@
     GET /api/books  내 책 목록     GET /api/search?q=  YES24 검색
     POST /api/books 꽂기           PUT·DELETE /api/books/번호  고치기·빼기
     POST /api/publish  게시
+    POST·DELETE /api/books/번호/notes  필사 사진 올리기·빼기
 -->
 <style>
   :root { --bg: #f4f2ec; --card: #fff; --ink: #1d1d1b; --muted: #8a877d; --line: #e3dfd3; --accent: #b0412e; --ok: #2f6b45; --warn: #fff4d6; }
@@ -56,6 +57,14 @@
   .item img, .item .ph { width: 40px; height: 58px; object-fit: cover; background: #eee; border-radius: 2px; }
   .item b { font-weight: 600; }
   .sample { font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+  /* 필사 사진 */
+  .notes-box { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+  .thumb { position: relative; width: 88px; }
+  .thumb img { width: 88px; height: 110px; object-fit: cover; display: block; border-radius: 4px; background: #eee; }
+  .thumb button { position: absolute; top: 3px; right: 3px; border: 0; border-radius: 99px; width: 22px; height: 22px; background: #000a; color: #fff; cursor: pointer; line-height: 1; }
+  .drop { display: block; border: 1px dashed var(--muted); border-radius: 8px; padding: 12px; text-align: center; color: var(--muted); cursor: pointer; }
+  .drop.over { border-color: var(--accent); color: var(--accent); background: #b0412e0d; }
   .guide { line-height: 1.7; }
   .guide pre { background: #1d1d1b; color: #f4f2ec; padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
   .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
@@ -153,7 +162,7 @@ async function load() {
   const books = [...STATE.books].sort((a, b) => (b.year - a.year) || ((b.month || 0) - (a.month || 0)) || (b.id - a.id));
   $('#list').innerHTML = books.map(b => `<div class="item">
       ${b.cover ? `<img src="${esc(b.cover)}" alt="">` : '<div class="ph"></div>'}
-      <div><b>${esc(b.title)}</b>${b.sample ? '<span class="sample">샘플</span>' : ''}${b.fav ? ' <span style="color:var(--accent)">♥</span>' : ''}
+      <div><b>${esc(b.title)}</b>${b.sample ? '<span class="sample">샘플</span>' : ''}${b.fav ? ' <span style="color:var(--accent)">♥</span>' : ''}${(b.notes || []).length ? ` <span class="muted">📷 ${b.notes.length}</span>` : ''}
         <div class="muted">${esc([b.author, `${b.year}${b.month ? '.' + b.month : ''}`, b.category].filter(Boolean).join(' · '))}</div></div>
       <div class="row"><button class="btn small" data-edit="${b.id}">고치기</button><button class="btn small" data-del="${b.id}">빼기</button></div>
     </div>`).join('') || '<p class="muted">아직 꽂힌 책이 없어요.</p>';
@@ -194,13 +203,73 @@ function showForm(book, id = null) {
       <label><input type="checkbox" id="f_fav" ${b.fav ? 'checked' : ''}> ♥ 추천하는 책</label>
       <label>한줄평</label><textarea id="f_review" placeholder="이 책을 한 문장으로">${esc(b.review || '')}</textarea>
       <label>좋아하는 구절 (선택)</label><textarea id="f_quote" placeholder="짧게. 책 문장을 길게 옮기면 저작권 문제가 생길 수 있어요">${esc(b.quote || '')}</textarea>
+      ${id ? `<div class="notes-box">
+        <label style="margin-top:0">필사 사진 <span id="noteCount"></span></label>
+        <div class="thumbs" id="thumbs"></div>
+        <label class="drop" id="drop">📷 사진을 끌어다 놓거나 눌러서 고르기 (여러 장 가능)
+          <input type="file" id="noteFile" accept="image/*" multiple hidden></label>
+        <p class="muted">올릴 때 긴 쪽 1600px로 줄이고 다시 그려서 저장해요. 그래서 사진 속 촬영 위치 정보는 빠져요. 책 문장을 길게 옮긴 필사는 공개하면 저작권 문제가 생길 수 있어요.</p>
+      </div>` : '<p class="muted">필사 사진은 책을 꽂은 뒤 [고치기]에서 올릴 수 있어요.</p>'}
       <div class="row" style="margin-top:12px">
         <button class="btn primary" id="saveBook">${id ? '고친 내용 저장' : '책장에 꽂기'}</button>
         <button class="btn" id="cancelBook">취소</button>
       </div>
     </div></div>`;
   $('#saveBook').onclick = () => saveBook(b);
+  if (id) setupNotes(id);
   $('#cancelBook').onclick = () => { editing = null; $('#formTitle').textContent = '2. 책장에 꽂기'; $('#formArea').innerHTML = '<p class="muted">왼쪽에서 책을 찾아 표지를 누르면 여기에 입력 칸이 열려요.</p>'; };
+}
+
+// ── 필사 사진 ──
+function drawThumbs(id) {
+  const b = STATE.books.find(x => x.id === id) || {};
+  const notes = b.notes || [];
+  $('#noteCount').textContent = notes.length ? `${notes.length}장` : '';
+  $('#thumbs').innerHTML = notes.map(n => `<div class="thumb"><a href="/site/${esc(n)}" target="_blank"><img src="/site/${esc(n)}" alt=""></a>
+    <button type="button" title="이 사진 빼기" data-note="${esc(n)}">×</button></div>`).join('');
+}
+
+// 사진을 화면에서 다시 그려 JPEG 로 만든다. 크기를 줄이고, 촬영 위치 같은 정보(EXIF)를 떼어 낸다
+async function shrink(file, max = 1600) {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.85);
+}
+
+async function uploadNotes(id, files) {
+  for (const f of files) {
+    if (!f.type.startsWith('image/')) continue;
+    try {
+      toast(`「${f.name}」 올리는 중…`);
+      const image = await shrink(f);
+      const book = await api(`/api/books/${id}/notes`, { method: 'POST', body: { image } });
+      Object.assign(STATE.books.find(x => x.id === id), book);
+      drawThumbs(id);
+    } catch (e) {
+      toast(`「${f.name}」을 못 올렸어요. ${/decode|state|source/i.test(e.message) ? 'HEIC 사진이면 JPG로 바꿔서 올려 주세요' : e.message}`, true);
+    }
+  }
+  toast('필사 사진을 올렸어요. 게시하면 사이트에 나와요'); load();
+}
+
+function setupNotes(id) {
+  drawThumbs(id);
+  const drop = $('#drop');
+  $('#noteFile').onchange = e => uploadNotes(id, [...e.target.files]);
+  drop.ondragover = e => { e.preventDefault(); drop.classList.add('over'); };
+  drop.ondragleave = () => drop.classList.remove('over');
+  drop.ondrop = e => { e.preventDefault(); drop.classList.remove('over'); uploadNotes(id, [...e.dataTransfer.files]); };
+  $('#thumbs').onclick = async e => {
+    const n = e.target.dataset.note; if (!n) return;
+    if (!confirm('이 필사 사진을 뺄까요? 파일도 지워져요.')) return;
+    try {
+      const book = await api(`/api/books/${id}/notes?file=${encodeURIComponent(n)}`, { method: 'DELETE' });
+      Object.assign(STATE.books.find(x => x.id === id), book); drawThumbs(id); toast('뺐어요'); load();
+    } catch (err) { toast(err.message, true); }
+  };
 }
 
 async function saveBook(base) {

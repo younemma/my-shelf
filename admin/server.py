@@ -21,6 +21,7 @@ YES24 API 키는 .env 에만 둔다. 키는 이 서버가 YES24 에 물어볼 �
     python3 admin/server.py          # http://127.0.0.1:8799 어드민, /site/ 는 사이트 미리보기
     python3 admin/server.py 9000     # 포트 지정
 """
+import base64
 import json
 import os
 import re
@@ -40,6 +41,7 @@ ADMIN = ROOT / "admin"
 DOCS = ROOT / "docs"                               # GitHub Pages 가 여는 폴더
 BOOKS_PATH = ROOT / "data" / "books.json"          # 내 기록 원본
 SHELF_PATH = DOCS / "shelf.json"                   # 사이트가 읽는 파일
+NOTES_DIR = DOCS / "notes"                         # 필사 사진. 사이트와 함께 웹에 올라간다
 ENV_PATH = ROOT / ".env"
 DEFAULT_PORT = 8799
 
@@ -169,14 +171,40 @@ def clean_book(data, old=None):
     return book
 
 
+# 사이트로 내보내는 칸. notes 는 필사 사진 경로 목록 (docs/ 기준, 예: "notes/7-1763791234.jpg")
+PUBLIC = ["id", "title", "author", "publisher", "cover", "link", "media",
+          "year", "month", "category", "fav", "review", "quote", "notes"]
+
+
+def add_note(book, data_url):
+    """ 필사 사진 한 장을 docs/notes/ 에 저장하고 책에 붙인다.
+    사진은 어드민 화면이 미리 줄이고 JPEG 로 다시 그려서 보낸다. 그 과정에서 촬영 위치(GPS) 같은 정보는 빠진다. """
+    raw = base64.b64decode((data_url or "").split(",", 1)[-1])
+    if not raw.startswith(b"\xff\xd8"):
+        raise ValueError("JPEG 사진이 아니에요")
+    if len(raw) > 6 * 1024 * 1024:
+        raise ValueError("사진이 너무 커요 (6MB 넘음)")
+    NOTES_DIR.mkdir(parents=True, exist_ok=True)
+    name = f"{book['id']}-{int(time.time() * 1000)}.jpg"
+    (NOTES_DIR / name).write_bytes(raw)
+    book["notes"] = (book.get("notes") or []) + ["notes/" + name]
+    return book
+
+
+def remove_note_file(rel):
+    # notes/ 안의 파일만 지운다. 다른 경로가 들어와도 바깥은 건드리지 않게
+    target = (DOCS / rel).resolve()
+    if NOTES_DIR.resolve() in target.parents and target.is_file():
+        target.unlink()
+
+
 def new_id(db):
     return max([b.get("id", 0) for b in db["books"]] + [0]) + 1
 
 
 def publish(db):
     """ 사이트가 읽는 docs/shelf.json 을 새로 쓴다. 사이트에 필요한 칸만 내보낸다. """
-    keep = ["id", "title", "author", "publisher", "cover", "link", "media",
-            "year", "month", "category", "fav", "review", "quote"]
+    keep = PUBLIC
     books = sorted(db["books"], key=lambda b: (b.get("year") or 0, b.get("month") or 0, b.get("id")), reverse=True)
     out = {
         "shelf": db.get("shelf", {}),
@@ -197,8 +225,7 @@ def published_differs(db):
     except ValueError:
         return True
     ids = lambda books: sorted((b.get("id"), json.dumps(b, sort_keys=True, ensure_ascii=False)) for b in books)
-    keep = ["id", "title", "author", "publisher", "cover", "link", "media",
-            "year", "month", "category", "fav", "review", "quote"]
+    keep = PUBLIC
     mine = [{k: b.get(k) for k in keep} for b in db["books"]]
     return ids(mine) != ids(pub.get("books", [])) or pub.get("shelf") != db.get("shelf")
 
@@ -280,6 +307,14 @@ class Handler(SimpleHTTPRequestHandler):
                 db["shelf"] = {"title": (data.get("title") or "나의 책장").strip(), "owner": (data.get("owner") or "").strip()}
                 save_db(db)
                 return self.send_json(db["shelf"])
+            m = re.fullmatch(r"/api/books/(\d+)/notes", u.path)
+            if m:
+                book = next((b for b in db["books"] if b["id"] == int(m.group(1))), None)
+                if not book:
+                    return self.send_json({"error": "없는 책이에요"}, 404)
+                add_note(book, self.read_body().get("image"))
+                save_db(db)
+                return self.send_json(book)
             if u.path == "/api/publish":
                 return self.send_json({"count": publish(db)})
             if u.path == "/api/clear-samples":
@@ -309,10 +344,26 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_json({"error": str(e)}, 400)
 
     def do_DELETE(self):
-        m = re.fullmatch(r"/api/books/(\d+)", urllib.parse.urlparse(self.path).path)
+        u = urllib.parse.urlparse(self.path)
+        db = load_db()
+        # 필사 사진 한 장 빼기:  DELETE /api/books/번호/notes?file=notes/....jpg
+        m = re.fullmatch(r"/api/books/(\d+)/notes", u.path)
+        if m:
+            book = next((b for b in db["books"] if b["id"] == int(m.group(1))), None)
+            rel = urllib.parse.parse_qs(u.query).get("file", [""])[0]
+            if not book or rel not in (book.get("notes") or []):
+                return self.send_json({"error": "없는 사진이에요"}, 404)
+            book["notes"].remove(rel)
+            remove_note_file(rel)
+            save_db(db)
+            return self.send_json(book)
+        m = re.fullmatch(r"/api/books/(\d+)", u.path)
         if not m:
             return self.send_error(404)
-        db = load_db()
+        for b in db["books"]:
+            if b["id"] == int(m.group(1)):
+                for rel in b.get("notes") or []:   # 책을 빼면 그 책의 필사 사진도 지운다
+                    remove_note_file(rel)
         db["books"] = [b for b in db["books"] if b["id"] != int(m.group(1))]
         save_db(db)
         self.send_json({"ok": True})

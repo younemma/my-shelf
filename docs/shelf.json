@@ -16,8 +16,8 @@
    "year": 2026,
    "month": 11,
    "category": "문학",
-   "fav": false,
-   "review": "",
+   "fav": true,
+   "review": "나도 할수있다",
    "quote": ""
   },
   {

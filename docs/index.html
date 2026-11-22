@@ -6,73 +6,215 @@
 <title>나의 책장</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;1,400&family=Noto+Serif+KR:wght@400;500&display=swap" rel="stylesheet">
 <!--
   나의 책장 · 사이트 쪽
   이 폴더(docs/)가 GitHub Pages 로 웹에 올라간다. 화면은 이 파일 하나이고, 데이터는 같은 폴더의 shelf.json 하나만 읽는다.
   shelf.json 은 어드민의 [게시] 버튼이 만든다. 여기서 직접 고치지 말고 어드민에서 고친 뒤 게시한다.
   디자인은 마음대로 바꿔도 된다. shelf.json 을 읽는 부분만 남아 있으면 어드민과 게시는 그대로 돌아간다.
-  색, 글꼴, 칸 크기만 살짝 바꿀 때는 아래 :root 의 값을 고치면 화면 전체에 반영된다.
+  색, 글꼴, 간격만 살짝 바꿀 때는 아래 :root 의 값을 고치면 화면 전체에 반영된다.
+
+  화면 구성: 둥근 패널 두 장.
+  왼쪽 패널은 고정. 책장 이름(처음) 또는 고른 책의 저자·제목·감상이 크게 나온다.
+  오른쪽 패널은 스크롤. 위에는 표지를 넘겨 보는 칸, 아래에는 읽은 해별 목록.
 -->
 <style>
   :root {
-    --bg: #fbfaf6; --ink: #1d1d1b; --muted: #8a877d; --line: #e6e2d6; --accent: #b0412e; --card: #fff;
-    --cover-w: 150px;   /* 표지 칸의 최소 너비. 키우면 한 줄에 들어가는 책이 줄어든다 */
+    --page: #f6f5f2;     /* 패널 바깥 */
+    --panel: #e8e7e3;    /* 패널 */
+    --paper: #ffffff;    /* 표지 칸 */
+    --ink: #1d1d1b;
+    --muted: #6f6c66;
+    --line: #b9b7b1;
+    --accent: #9a3b2a;
+    --gap: 10px;         /* 패널 사이 간격 */
+    --radius: 16px;      /* 패널 모서리 */
+    --pad: 28px;         /* 패널 안쪽 여백 */
+    --wall: #fbfbf9;     /* 책꽂이 벽 */
+    --board: #f4f4f1;    /* 선반 판 윗면 */
+    --edge: #d9d8d3;     /* 선반 판 앞 모서리 */
+    --rail: #c9c8c3;     /* 벽에 붙은 세로 레일 */
+    --spine-h: 160px;    /* 책 높이 기준. 키우면 책이 커진다 */
+    --serif: "Crimson Pro", "Noto Serif KR", "AppleMyungjo", "Batang", serif;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #181816; --ink: #eeebe2; --muted: #9a968b; --line: #34332e; --accent: #e07a5f; --card: #23221f; }
+    :root:not([data-theme="light"]) {
+      --page: #121211; --panel: #1f1f1d; --paper: #2a2a27; --ink: #ecebe6;
+      --muted: #9b988f; --line: #4a4944; --accent: #e08a72; --wall: #191917; --board: #2c2c29; --edge: #3d3c38; --rail: #3a3936;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page: #121211; --panel: #1f1f1d; --paper: #2a2a27; --ink: #ecebe6;
+    --muted: #9b988f; --line: #4a4944; --accent: #e08a72; --wall: #191917; --board: #2c2c29; --edge: #3d3c38; --rail: #3a3936;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Gothic A1", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
-  header { padding: 40px 24px 8px; max-width: 1240px; margin: 0 auto; }
-  h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 800; letter-spacing: -0.02em; margin: 0; }
-  .owner { color: var(--muted); margin-top: 8px; font-size: 14px; }
-  main { max-width: 1240px; margin: 0 auto; padding: 8px 24px 64px; }
-
-  /* 연도별 묶음 */
-  .year { margin-top: 40px; }
-  .year h2 { font-size: 15px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 10px; margin: 0 0 22px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--cover-w), 1fr)); gap: 34px 22px; align-items: end; }
-
-  /* 책 한 권. 표지는 아래쪽을 맞춰 선반에 꽂힌 것처럼 */
-  .book { background: none; border: 0; padding: 0; cursor: pointer; text-align: center; color: inherit; font: inherit; }
-  .book img { width: 100%; display: block; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 8px 18px rgba(0,0,0,.10); transition: transform .15s; }
-  .book:hover img, .book:focus-visible img { transform: translateY(-4px); }
-  .marks { height: 22px; margin-top: 8px; font-size: 14px; color: var(--accent); }
-  /* 표지가 없는 책은 제목 카드로 */
-  .nocover { aspect-ratio: 2 / 3; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 14px; background: var(--card); border: 1px solid var(--line); text-align: left; }
-  .nocover b { font-size: 15px; line-height: 1.35; }
-  .nocover span { font-size: 12px; color: var(--muted); }
-
-  /* 책 상세 */
-  dialog { border: 0; border-radius: 10px; padding: 0; width: min(760px, calc(100% - 32px)); background: var(--card); color: var(--ink); }
-  dialog::backdrop { background: rgba(20,20,18,.45); }
-  .detail { display: grid; grid-template-columns: 220px 1fr; gap: 28px; padding: 28px; }
-  .detail img { width: 100%; box-shadow: 0 8px 20px rgba(0,0,0,.15); }
-  .detail h3 { font-size: 22px; margin: 0 0 6px; line-height: 1.3; }
-  .meta { color: var(--muted); font-size: 14px; line-height: 1.7; }
-  .review { margin-top: 18px; font-size: 15.5px; line-height: 1.7; }
-  .quote { margin-top: 14px; padding-left: 14px; border-left: 2px solid var(--accent); font-style: italic; line-height: 1.7; }
-  .detail a { color: var(--accent); font-size: 14px; display: inline-block; margin-top: 18px; }
-  .close { position: absolute; top: 10px; right: 14px; border: 0; background: none; font-size: 26px; color: var(--muted); cursor: pointer; }
-  @media (max-width: 600px) {
-    :root { --cover-w: 104px; }
-    .grid { gap: 26px 14px; }
-    .detail { grid-template-columns: 1fr; }
-    .detail img { width: 150px; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font-family: var(--serif); font-size: 17px; line-height: 1.35;
+    -webkit-font-smoothing: antialiased;
   }
-  footer { max-width: 1240px; margin: 0 auto; padding: 24px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); }
-  footer a { color: inherit; }
-  .empty { color: var(--muted); padding: 60px 0; }
+  button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+  a { color: inherit; }
+
+  .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); padding: var(--gap); min-height: 100vh; }
+  .panel { background: var(--panel); border-radius: var(--radius); padding: var(--pad); }
+
+  /* ── 왼쪽: 고정 패널 ── */
+  .left {
+    position: sticky; top: var(--gap); height: calc(100vh - var(--gap) * 2);
+    display: flex; flex-direction: column; overflow: auto;
+  }
+  .topbar { display: flex; justify-content: space-between; gap: 16px; font-size: 15px; }
+  .topbar button:hover { text-decoration: underline; text-underline-offset: 3px; }
+  .author { font-size: clamp(34px, 4.4vw, 64px); font-weight: 400; line-height: 1.05; letter-spacing: -0.01em; margin: 18px 0 0; }
+  .titleblock { margin-top: auto; padding-top: 48px; }
+  .bigtitle {
+    font-size: clamp(44px, 5.6vw, 84px); font-weight: 400; line-height: 1.02;
+    letter-spacing: -0.015em; margin: 0; word-break: keep-all; overflow-wrap: anywhere;
+  }
+  .bigtitle.long { font-size: clamp(32px, 3.6vw, 54px); line-height: 1.08; }  /* 긴 제목은 한 단계 작게 */
+  .sub { font-style: italic; font-size: clamp(20px, 2.1vw, 30px); margin: 14px 0 0; }
+  .colophon { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 15px; font-weight: 500; }
+  .colophon p { margin: 0 0 10px; }
+  .colophon .indent { padding-left: 3em; }
+  .notes { font-size: 16px; font-weight: 400; line-height: 1.5; }
+  .notes .quote { font-style: italic; border-left: 1px solid var(--line); padding-left: 14px; }
+  .notes a { color: var(--accent); }
+  .fav { color: var(--accent); }
+
+  /* ── 오른쪽: 스크롤 패널 ── */
+  .right { display: flex; flex-direction: column; gap: var(--gap); }
+  .viewer { min-height: calc(100vh - var(--gap) * 2); display: flex; align-items: center; justify-content: center; }
+  .frame {
+    position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--paper);
+    display: flex; align-items: center; justify-content: center; overflow: hidden;
+  }
+  .frame img { height: 74%; margin-bottom: 10%;   /* 아래쪽은 캡션 자리 */
+    max-width: 70%; object-fit: contain; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 10px 24px rgba(0,0,0,.12); }
+  .frame .nocover {
+    height: 74%; margin-bottom: 10%; aspect-ratio: 2 / 3; border: 1px solid var(--line); padding: 18px;
+    display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; text-align: left;
+  }
+  .frame .nocover b { font-weight: 500; font-size: 20px; line-height: 1.2; }
+  .caption { position: absolute; left: 10px; bottom: 10px; font-family: -apple-system, "Helvetica Neue", sans-serif; font-size: 10px; line-height: 1.35; color: var(--muted); }
+  .nav { position: absolute; top: 0; bottom: 0; width: 50%; }
+  .nav.prev { left: 0; cursor: w-resize; }
+  .nav.next { right: 0; cursor: e-resize; }
+
+  /* 책 한 권 묶음: 큰 표지 + (휴대폰에서만) 책 정보 + 필사 사진. 오른쪽에 차례로 쌓여 쭉 내려 본다 */
+  .book-entry { display: flex; flex-direction: column; gap: var(--gap); scroll-margin-top: var(--gap); }
+  .np-head { display: flex; justify-content: space-between; gap: 12px; font-size: 15px; margin-bottom: 4px; }
+  .np-head small { color: var(--muted); font-size: 14px; }
+  .np a { display: block; margin-top: 14px; }
+  .np img { width: 100%; display: block; background: var(--paper); }
+  .m-info { display: none; }
+  .m-info .m-author { font-size: 16px; margin: 0; }
+  .m-info .m-title { font-size: 30px; font-weight: 400; line-height: 1.1; margin: 6px 0 6px; word-break: keep-all; }
+
+  /* ── 맨 위: 책상 책꽂이. 해마다 선반 한 칸, 새 해의 선반이 맨 위에 쌓인다 ── */
+  .wall { margin: var(--gap); min-height: calc(100vh - var(--gap) * 2); display: flex; flex-direction: column; background: var(--wall); }
+  .wall-head { display: flex; justify-content: space-between; gap: 16px; font-size: 15px; }
+  .wall-title { font-size: clamp(40px, 5vw, 72px); font-weight: 400; line-height: 1; letter-spacing: -0.015em; margin: 18px 0 40px; }
+
+  /* 벽에 붙은 모듈 선반. 세로 레일 위에 얇은 판을 걸고, 판 양끝은 위로 꺾여 책을 받친다.
+     해마다 선반 한 칸, 새 해의 선반이 맨 위에 쌓인다 */
+  .shelves {
+    --cols: 3;   /* 선반 한 줄의 칸 수. 칸 하나가 한 달 */
+    position: relative; display: flex; flex-direction: column; gap: 44px; padding: 20px 0 36px;
+    border-left: 2px solid var(--rail); border-right: 2px solid var(--rail);   /* 레일은 양끝에만 */
+  }
+  .year-group { display: flex; flex-direction: column; gap: 40px; }
+  .shelf { position: relative; display: grid; grid-template-columns: repeat(var(--cols), 1fr); }
+  .tag { font-size: 14px; color: var(--muted); margin: 0 0 -22px 22px; position: relative; z-index: 1; }
+  .tag b { font-weight: 500; color: var(--ink); margin-right: 6px; }
+
+  /* 한 칸 = 한 달. 얇은 판 양끝이 위로 꺾여 책을 받치고, 그림자는 왼쪽 아래로 길게 진다 */
+  .bay { position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; align-content: flex-end; gap: 1px;
+         min-height: calc(var(--spine-h) * 1.06 + 26px); padding: 26px 22px 0; }
+  .bay::after {
+    content: ""; position: absolute; left: 4px; right: 2px; bottom: -9px; height: 9px;
+    background: var(--board); border-bottom: 2px solid var(--edge);
+    box-shadow: -56px 28px 26px -12px rgba(0,0,0,.20), 0 2px 3px rgba(0,0,0,.07);
+  }
+  .bay::before, .bay .end {
+    content: ""; position: absolute; bottom: 0; left: 4px; width: 3px; height: 30px; background: var(--edge);
+    box-shadow: -22px 10px 14px rgba(0,0,0,.12);
+  }
+  .bay .end { left: auto; right: 2px; }
+  .bay.empty::before, .bay.empty .end { box-shadow: -22px 10px 14px rgba(0,0,0,.08); }
+  .bay .m { position: absolute; top: 0; right: 22px; font-size: 12px; font-style: italic; color: var(--muted); white-space: nowrap; }
+
+  /* 책 한 권. 책등이 보이게 세워서 꽂는다. 책등 색은 표지 왼쪽 끝을 그대로 쓴다 */
+  .book { position: relative; flex: none; width: var(--w); height: var(--h); }
+  .book .sp {
+    position: absolute; inset: 0; display: flex; justify-content: center; overflow: hidden;
+    background-color: var(--c, #b8b2a6);
+    border-radius: 1px 1px 0 0; transition: transform .18s;
+    box-shadow: inset -2px 0 3px rgba(0,0,0,.22), inset 2px 0 2px rgba(255,255,255,.22), -8px 4px 8px rgba(0,0,0,.10);
+  }
+  .book .sp::before {   /* 표지를 흐리게 깔아 책등 색으로. 표지 색이 그대로 묻어난다 */
+    content: ""; position: absolute; inset: -14px; background-image: var(--img); background-size: cover; background-position: 0 50%;
+    filter: blur(9px) saturate(1.15);
+  }
+  .book .sp b { position: relative;
+    writing-mode: vertical-rl; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-height: calc(100% - 26px); margin-top: 12px; padding: 5px 0;
+    background: rgba(255,255,255,.82); color: #1d1d1b; font-size: 11px; font-weight: 500; line-height: 1.15;
+  }
+  .book:hover .sp, .book:focus-visible .sp, .book[aria-current="true"] .sp,
+  .book:hover .side, .book:focus-visible .side, .book[aria-current="true"] .side { transform: translateY(-10px); }
+
+  /* YES24 가 주는 진짜 책등 사진. 비율은 그대로 두고 높이만 맞춘다(두께가 곧 사진 비율).
+     사진이 없거나 '이미지 준비중'이면 위의 표지 색 책등을 그대로 쓴다 */
+  .book .side { display: none; height: 100%; width: auto; transition: transform .18s;
+                box-shadow: inset 0 0 0 1px rgba(0,0,0,.04), -8px 4px 8px rgba(0,0,0,.10); }
+  .book.real { width: auto; }
+  .book.real .side { display: block; }
+  .book.real .sp { display: none; }
+  .book.real[aria-current="true"] .side { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .book[aria-current="true"] .sp b { background: var(--accent); color: #fff; }
+  .peek {   /* 마우스를 올리면 위에 표지가 잠깐 보인다 */
+    position: absolute; bottom: calc(100% + 18px); left: 50%; width: 86px; transform: translateX(-50%);
+    opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 5;
+  }
+  .peek img { width: 100%; display: block; box-shadow: 0 10px 24px rgba(0,0,0,.22); }
+  .book:hover .peek, .book:focus-visible .peek { opacity: 1; }
+  .hint { margin-top: auto; padding-top: 56px; font-size: 14px; color: var(--muted); font-style: italic; }
+  .hint button:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  .intro { font-style: italic; font-size: 16px; line-height: 1.45; margin: 0; }
+  footer { padding: 6px calc(var(--gap) + var(--pad)) 22px; font-size: 13.5px; color: var(--muted); }
+  .empty { color: var(--muted); }
+
+  @media (max-width: 820px) {
+    :root { --pad: 18px; }
+    .wrap { grid-template-columns: 1fr; }
+    .left { display: none; }   /* 휴대폰에서는 책마다 아래에 정보를 붙인다 */
+    .m-info { display: block; }
+    .viewer { min-height: 0; }
+    .frame { aspect-ratio: 1 / 1; }
+    :root { --spine-h: 150px; }
+    .wall { min-height: 0; }
+    .shelves { --cols: 2; }
+    .bay { padding: 24px 14px 0; }
+    .bay .m { right: 14px; }
+    .tag { margin-left: 14px; }
+    .peek { width: 70px; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1 id="title">나의 책장</h1>
-  <p class="owner" id="owner"></p>
-</header>
-<main id="shelf"></main>
-<dialog id="dlg"><button class="close" aria-label="닫기" onclick="document.getElementById('dlg').close()">×</button><div id="detail"></div></dialog>
+<section class="panel wall" aria-label="책꽂이">
+  <div class="wall-head"><span id="wall-name"></span><span id="wall-count"></span></div>
+  <h1 class="wall-title" id="wall-title"></h1>
+  <div class="shelves" id="shelf"></div>
+  <p class="hint"><button type="button" id="godown">↓ 아래로 내리면 모든 책을 크게, 필사와 함께 볼 수 있어요</button></p>
+</section>
+<div class="wrap" id="detail">
+  <aside class="panel left" id="left" aria-live="polite"></aside>
+  <main class="right" id="stack"></main>
+</div>
 <footer>
   <!-- YES24 API 이용 조건. 화면에 출처를 표시하고 상품 페이지로 가는 링크를 둔다. 지우지 말 것 -->
   도서 정보와 표지 제공 <a href="https://www.yes24.com" target="_blank" rel="noopener">YES24</a> · <span id="updated"></span>
@@ -82,52 +224,191 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // YES24 표지 주소 끝의 크기 글자를 바꾼다. 목록은 L, 크게 볼 때는 XL
 const sized = (url, size) => /image\.yes24\.com\/goods\/\d+\/[A-Z]+$/.test(url || '') ? url.replace(/\/[A-Z]+$/, '/' + size) : url;
+let DATA = { shelf: {}, books: [] };
 let BOOKS = [];
+let current = 0;    // 지금 화면 가운데 있는 책의 순번. 왼쪽 패널이 이 책을 보여 준다
 
-function coverHtml(b, size) {
+function coverHtml(b) {
   return b.cover
-    ? `<img src="${esc(sized(b.cover, size))}" alt="${esc(b.title)} 표지" loading="lazy">`
+    ? `<img src="${esc(sized(b.cover, 'XL'))}" alt="${esc(b.title)} 표지">`
     : `<div class="nocover"><b>${esc(b.title)}</b><span>${esc(b.author)}</span></div>`;
 }
 
-function render(data) {
-  const shelf = data.shelf || {};
-  document.title = shelf.title || '나의 책장';
-  $('#title').textContent = shelf.title || '나의 책장';
-  $('#owner').textContent = (shelf.owner ? `책장 주인 · ${shelf.owner} · ` : '') + `${data.books.length}권`;
-  $('#updated').textContent = data.updated ? `${data.updated} 업데이트` : '';
-  BOOKS = data.books;
-  if (!BOOKS.length) { $('#shelf').innerHTML = '<p class="empty">아직 꽂힌 책이 없어요.</p>'; return; }
+// 제목을 몇 줄로 나눠 크게 보이게. 영어 제목은 단어마다, 한글 제목은 그대로 두고 브라우저가 줄을 바꾼다
+function stacked(title) {
+  const t = String(title || '');
+  const words = t.split(/\s+/);
+  return /^[\x00-\x7F]+$/.test(t) && words.length <= 4 ? words.map(esc).join('<br>') : esc(t);
+}
 
-  // 읽은 해로 묶는다. shelf.json 이 이미 최근 순으로 정렬돼 있다
+function topbar() {
+  const s = DATA.shelf || {};
+  return `<div class="topbar">
+    <button type="button" data-home>${esc(s.title || '나의 책장')}</button>
+    <span>${current + 1}/${BOOKS.length}</span>
+  </div>`;
+}
+
+function renderLeft() {
+  const s = DATA.shelf || {};
+  if (!BOOKS.length) {
+    const years = [...new Set(BOOKS.map(b => b.year))];
+    $('#left').innerHTML = `${topbar()}
+      <h1 class="author">${esc(s.owner || 'Reading Shelf')}</h1>
+      <div class="titleblock">
+        <h2 class="bigtitle">${esc(s.title || '나의 책장').split(/\s+/).join('<br>')}</h2>
+        <p class="sub">읽은 책들의 기록</p>
+        <div class="colophon">
+          <p>${years.length ? `${esc(years[years.length - 1])}–${esc(years[0])}` : ''}<br><span class="indent">${BOOKS.length}권의 책</span></p>
+          <p>${DATA.updated ? `${esc(DATA.updated)} 업데이트` : ''}</p>
+        </div>
+      </div>`;
+    return;
+  }
+  const b = BOOKS[current];
+  const when = `${b.year}년${b.month ? ' ' + b.month + '월' : ''} 읽음`;
+  $('#left').innerHTML = `${topbar()}
+    <h1 class="author">${esc(b.author)}</h1>
+    <div class="titleblock">
+      <h2 class="bigtitle${String(b.title).length > 22 ? ' long' : ''}">${stacked(b.title)}</h2>
+      <p class="sub">${esc([b.category, b.media].filter(Boolean).join(', '))}${b.fav ? ' <span class="fav">♥</span>' : ''}</p>
+      <div class="colophon">
+        <p>${esc(b.publisher)}<br><span class="indent">${esc(when)}</span></p>
+        ${(b.notes || []).length ? `<p>필사 ${b.notes.length}장 <span style="color:var(--muted)">→ 오른쪽 아래</span></p>` : ''}
+        ${b.review || b.quote || b.link ? `<div class="notes">
+          ${b.review ? `<p>${esc(b.review)}</p>` : ''}
+          ${b.quote ? `<p class="quote">${esc(b.quote)}</p>` : ''}
+          ${b.link ? `<p><a href="${esc(b.link)}" target="_blank" rel="noopener">YES24에서 보기 ↗</a></p>` : ''}
+        </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function infoHtml(b) {   // 휴대폰에서 책마다 붙는 정보
+  const when = `${b.year}년${b.month ? ' ' + b.month + '월' : ''} 읽음`;
+  return `<section class="panel m-info">
+    <p class="m-author">${esc(b.author)}</p>
+    <h2 class="m-title">${esc(b.title)}</h2>
+    <p class="sub" style="font-size:18px;margin:0">${esc([b.category, b.media].filter(Boolean).join(', '))}${b.fav ? ' <span class="fav">♥</span>' : ''}</p>
+    <div class="colophon" style="margin-top:20px">
+      <p>${esc(b.publisher)} · ${esc(when)}</p>
+      <div class="notes">
+        ${b.review ? `<p>${esc(b.review)}</p>` : ''}
+        ${b.quote ? `<p class="quote">${esc(b.quote)}</p>` : ''}
+        ${b.link ? `<p><a href="${esc(b.link)}" target="_blank" rel="noopener">YES24에서 보기 ↗</a></p>` : ''}
+      </div>
+    </div></section>`;
+}
+
+// 아래 두 화면의 오른쪽. 모든 책을 차례로 쌓는다. 필사 사진이 있으면 그 책 바로 아래에
+function renderStack() {
+  $('#stack').innerHTML = BOOKS.map((b, i) => `<article class="book-entry" id="b-${i}" data-i="${i}">
+    <section class="panel viewer" aria-label="${esc(b.title)} 표지"><div class="frame">${coverHtml(b)}
+      <div class="caption">${String(i + 1).padStart(2, '0')}—${BOOKS.length}<br>${esc(b.title)}<br>${esc(b.year)}</div>
+      <button class="nav prev" type="button" aria-label="이전 책" data-step="-1"></button>
+      <button class="nav next" type="button" aria-label="다음 책" data-step="1"></button>
+    </div></section>
+    ${infoHtml(b)}
+    ${(b.notes || []).length ? `<section class="panel np" aria-label="필사">
+      <div class="np-head"><span>필사</span><small>${b.notes.length}장 · ${esc(b.title)}</small></div>
+      ${b.notes.map(n => `<a href="${esc(n)}" target="_blank" rel="noopener"><img src="${esc(n)}" alt="${esc(b.title)} 필사" loading="lazy"></a>`).join('')}
+    </section>` : ''}
+  </article>`).join('');
+  // 화면 가운데를 지나는 책을 왼쪽 패널에 보여 준다
+  if (window._io) _io.disconnect();
+  window._io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) setCurrent(Number(e.target.dataset.i));
+  }), { rootMargin: '-45% 0px -45% 0px' });
+  document.querySelectorAll('.book-entry').forEach(el => _io.observe(el));
+}
+
+// 책마다 조금씩 다른 두께와 높이. 같은 책은 늘 같은 모양으로 나오게 id 로 정한다
+const SPINE_COLORS = ['#b8b2a6', '#8f9a8c', '#a3836c', '#7d8794', '#c2a98a', '#6f6a63'];
+// YES24 책등 사진 주소. 표지 주소 .../goods/번호/L 에 SIDE 를 끼우면 된다 (API 의 sideCover 와 같은 주소)
+const sideUrl = url => /image\.yes24\.com\/goods\/\d+\/[A-Z]+$/.test(url || '') ? url.replace(/\/([A-Z]+)$/, '/SIDE/L') : '';
+// 책등 사진이 진짜 책등일 때만 쓴다. '이미지 준비중' 그림은 가로로 넓어서 비율로 걸러진다
+function sideLoaded(img) {
+  if (img.naturalWidth && img.naturalWidth / img.naturalHeight < 0.25) img.closest('.book').classList.add('real');
+}
+
+function spine(b) {
+  const n = Number(b.id) || 0;
+  const src = b.cover ? esc(sized(b.cover, 'L')) : '';
+  const side = esc(sideUrl(b.cover));
+  return `<span class="sp" style="${src ? `--img:url('${src}');` : ''}--c:${SPINE_COLORS[n % SPINE_COLORS.length]}"><b>${esc(b.title)}</b></span>`
+    + (side ? `<img class="side" src="${side}" alt="" onload="sideLoaded(this)">` : '')
+    + (src ? `<span class="peek"><img src="${src}" alt="" loading="lazy"></span>` : '');
+}
+function spineSize(b) {
+  const n = Number(b.id) || 0;
+  const h = (0.9 + (n * 37 % 5) * 0.025).toFixed(3);                                     // 키는 책마다 조금씩
+  const w = (0.075 + Math.min(0.04, String(b.title || '').length * 0.0015)).toFixed(4);  // 책등 사진이 없을 때 두께(키에 대한 비율)
+  return `--h:calc(var(--spine-h) * ${h});--w:calc(var(--spine-h) * ${h} * ${w})`;
+}
+
+// 맨 위 책꽂이. 해마다 선반 한 칸(최근 해가 맨 위), 선반 안은 읽은 달마다 북엔드로 나눈다
+function renderList() {
+  const s = DATA.shelf || {};
+  $('#wall-name').textContent = s.owner || 'Reading Shelf';
+  $('#wall-count').textContent = `${BOOKS.length}권${DATA.updated ? ' · ' + DATA.updated : ''}`;
+  $('#wall-title').textContent = s.title || '나의 책장';
+  if (!BOOKS.length) { $('#shelf').innerHTML = '<p class="empty">아직 꽂힌 책이 없어요.</p>'; return; }
+  // shelf.json 이 이미 최근 순으로 정렬돼 있다
   const years = [...new Set(BOOKS.map(b => b.year))];
   $('#shelf').innerHTML = years.map(y => {
-    const list = BOOKS.filter(b => b.year === y);
-    return `<section class="year"><h2>${esc(y)} · ${list.length}권</h2><div class="grid">${
-      list.map(b => `<button class="book" data-id="${b.id}">${coverHtml(b, 'L')}
-        <div class="marks">${b.fav ? '♥' : ''}${b.review || b.quote ? ' 📝' : ''}</div></button>`).join('')
-    }</div></section>`;
+    const list = BOOKS.map((b, i) => [b, i]).filter(([b]) => b.year === y);
+    const months = [...new Set(list.map(([b]) => b.month || 0))];
+    const COLS = matchMedia('(max-width: 820px)').matches ? 2 : 3;
+    const bays = months.map(m => `<div class="bay"><i class="end"></i>
+        <span class="m">${m ? esc(m) + '월' : '달 모름'}</span>
+        ${list.filter(([b]) => (b.month || 0) === m).map(([b, i]) =>
+          `<button class="book" type="button" data-i="${i}" aria-current="${i === current}" style="${spineSize(b)}" title="${esc(b.title)} · ${esc(b.author)}">${spine(b)}</button>`).join('')}
+      </div>`);
+    while (bays.length % COLS) bays.push('<div class="bay empty"><i class="end"></i></div>');   // 빈 칸도 선반은 걸려 있게
+    const rows = [];
+    for (let k = 0; k < bays.length; k += COLS) rows.push(`<div class="shelf">${bays.slice(k, k + COLS).join('')}</div>`);
+    return `<div class="year-group"><p class="tag"><b>${esc(y)}</b>${list.length}권</p>${rows.join('')}</div>`;
   }).join('');
 }
 
-function openBook(id) {
-  const b = BOOKS.find(x => x.id === id);
-  if (!b) return;
-  const when = `${b.year}년${b.month ? ' ' + b.month + '월' : ''}`;
-  $('#detail').innerHTML = `<div class="detail">
-    <div>${coverHtml(b, 'XL')}</div>
-    <div>
-      <h3>${esc(b.title)}</h3>
-      <div class="meta">${esc([b.author, b.publisher].filter(Boolean).join(' · '))}<br>${esc([when + ' 읽음', b.media, b.category].filter(Boolean).join(' · '))}${b.fav ? ' · <span style="color:var(--accent)">♥ 추천</span>' : ''}</div>
-      ${b.review ? `<p class="review">${esc(b.review)}</p>` : ''}
-      ${b.quote ? `<p class="quote">${esc(b.quote)}</p>` : ''}
-      ${b.link ? `<a href="${esc(b.link)}" target="_blank" rel="noopener">YES24에서 보기 ↗</a>` : ''}
-    </div></div>`;
-  $('#dlg').showModal();
+function setCurrent(i) {
+  if (i === current && $('#left').innerHTML) return;
+  current = i;
+  renderLeft();
+  document.querySelectorAll('.book').forEach(el => el.setAttribute('aria-current', String(Number(el.dataset.i) === current)));
+}
+function goTo(i) {   // 그 책 자리로 내려간다
+  if (!BOOKS.length) return;
+  i = (i + BOOKS.length) % BOOKS.length;
+  setCurrent(i);
+  document.getElementById('b-' + i).scrollIntoView({ behavior: 'smooth' });
 }
 
-$('#shelf').addEventListener('click', e => { const el = e.target.closest('.book'); if (el) openBook(Number(el.dataset.id)); });
-$('#dlg').addEventListener('click', e => { if (e.target.id === 'dlg') $('#dlg').close(); });   // 바깥을 누르면 닫힘
+function render(data) {
+  DATA = data;
+  BOOKS = data.books || [];
+  document.title = (data.shelf && data.shelf.title) || '나의 책장';
+  $('#updated').textContent = data.updated ? `${data.updated} 업데이트` : '';
+  current = 0;
+  renderLeft(); renderList(); renderStack();
+}
+
+document.addEventListener('click', e => {
+  const entry = e.target.closest('.book');
+  if (entry) return goTo(Number(entry.dataset.i));
+  if (e.target.closest('#godown')) return goTo(0);
+  const nav = e.target.closest('[data-step]');
+  if (nav) return goTo(current + Number(nav.dataset.step));
+  if (e.target.closest('[data-home]')) window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+document.addEventListener('keydown', e => {
+  if (!BOOKS.length) return;
+  if (e.key === 'ArrowRight') goTo(current + 1);
+  if (e.key === 'ArrowLeft') goTo(current - 1);
+  if (e.key === 'Escape') window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+matchMedia('(max-width: 820px)').addEventListener('change', () => BOOKS.length && renderList());
 
 // 캐시 때문에 게시한 내용이 늦게 보이지 않게 매번 새로 받는다
 fetch('shelf.json?t=' + Date.now()).then(r => r.json()).then(render)

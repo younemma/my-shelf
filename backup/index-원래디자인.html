@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>나의 책장</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gothic+A1:wght@400;600;800&display=swap" rel="stylesheet">
+<!--
+  나의 책장 · 사이트 쪽
+  이 폴더(docs/)가 GitHub Pages 로 웹에 올라간다. 화면은 이 파일 하나이고, 데이터는 같은 폴더의 shelf.json 하나만 읽는다.
+  shelf.json 은 어드민의 [게시] 버튼이 만든다. 여기서 직접 고치지 말고 어드민에서 고친 뒤 게시한다.
+  디자인은 마음대로 바꿔도 된다. shelf.json 을 읽는 부분만 남아 있으면 어드민과 게시는 그대로 돌아간다.
+  색, 글꼴, 칸 크기만 살짝 바꿀 때는 아래 :root 의 값을 고치면 화면 전체에 반영된다.
+-->
+<style>
+  :root {
+    --bg: #fbfaf6; --ink: #1d1d1b; --muted: #8a877d; --line: #e6e2d6; --accent: #b0412e; --card: #fff;
+    --cover-w: 150px;   /* 표지 칸의 최소 너비. 키우면 한 줄에 들어가는 책이 줄어든다 */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #181816; --ink: #eeebe2; --muted: #9a968b; --line: #34332e; --accent: #e07a5f; --card: #23221f; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Gothic A1", -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  header { padding: 40px 24px 8px; max-width: 1240px; margin: 0 auto; }
+  h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+  .owner { color: var(--muted); margin-top: 8px; font-size: 14px; }
+  main { max-width: 1240px; margin: 0 auto; padding: 8px 24px 64px; }
+
+  /* 연도별 묶음 */
+  .year { margin-top: 40px; }
+  .year h2 { font-size: 15px; font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--line); padding-bottom: 10px; margin: 0 0 22px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--cover-w), 1fr)); gap: 34px 22px; align-items: end; }
+
+  /* 책 한 권. 표지는 아래쪽을 맞춰 선반에 꽂힌 것처럼 */
+  .book { background: none; border: 0; padding: 0; cursor: pointer; text-align: center; color: inherit; font: inherit; }
+  .book img { width: 100%; display: block; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 8px 18px rgba(0,0,0,.10); transition: transform .15s; }
+  .book:hover img, .book:focus-visible img { transform: translateY(-4px); }
+  .marks { height: 22px; margin-top: 8px; font-size: 14px; color: var(--accent); }
+  /* 표지가 없는 책은 제목 카드로 */
+  .nocover { aspect-ratio: 2 / 3; display: flex; flex-direction: column; justify-content: center; gap: 8px; padding: 14px; background: var(--card); border: 1px solid var(--line); text-align: left; }
+  .nocover b { font-size: 15px; line-height: 1.35; }
+  .nocover span { font-size: 12px; color: var(--muted); }
+
+  /* 책 상세 */
+  dialog { border: 0; border-radius: 10px; padding: 0; width: min(760px, calc(100% - 32px)); background: var(--card); color: var(--ink); }
+  dialog::backdrop { background: rgba(20,20,18,.45); }
+  .detail { display: grid; grid-template-columns: 220px 1fr; gap: 28px; padding: 28px; }
+  .detail img { width: 100%; box-shadow: 0 8px 20px rgba(0,0,0,.15); }
+  .detail h3 { font-size: 22px; margin: 0 0 6px; line-height: 1.3; }
+  .meta { color: var(--muted); font-size: 14px; line-height: 1.7; }
+  .review { margin-top: 18px; font-size: 15.5px; line-height: 1.7; }
+  .quote { margin-top: 14px; padding-left: 14px; border-left: 2px solid var(--accent); font-style: italic; line-height: 1.7; }
+  .detail a { color: var(--accent); font-size: 14px; display: inline-block; margin-top: 18px; }
+  .close { position: absolute; top: 10px; right: 14px; border: 0; background: none; font-size: 26px; color: var(--muted); cursor: pointer; }
+  @media (max-width: 600px) {
+    :root { --cover-w: 104px; }
+    .grid { gap: 26px 14px; }
+    .detail { grid-template-columns: 1fr; }
+    .detail img { width: 150px; }
+  }
+  footer { max-width: 1240px; margin: 0 auto; padding: 24px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--line); }
+  footer a { color: inherit; }
+  .empty { color: var(--muted); padding: 60px 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">나의 책장</h1>
+  <p class="owner" id="owner"></p>
+</header>
+<main id="shelf"></main>
+<dialog id="dlg"><button class="close" aria-label="닫기" onclick="document.getElementById('dlg').close()">×</button><div id="detail"></div></dialog>
+<footer>
+  <!-- YES24 API 이용 조건. 화면에 출처를 표시하고 상품 페이지로 가는 링크를 둔다. 지우지 말 것 -->
+  도서 정보와 표지 제공 <a href="https://www.yes24.com" target="_blank" rel="noopener">YES24</a> · <span id="updated"></span>
+</footer>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// YES24 표지 주소 끝의 크기 글자를 바꾼다. 목록은 L, 크게 볼 때는 XL
+const sized = (url, size) => /image\.yes24\.com\/goods\/\d+\/[A-Z]+$/.test(url || '') ? url.replace(/\/[A-Z]+$/, '/' + size) : url;
+let BOOKS = [];
+
+function coverHtml(b, size) {
+  return b.cover
+    ? `<img src="${esc(sized(b.cover, size))}" alt="${esc(b.title)} 표지" loading="lazy">`
+    : `<div class="nocover"><b>${esc(b.title)}</b><span>${esc(b.author)}</span></div>`;
+}
+
+function render(data) {
+  const shelf = data.shelf || {};
+  document.title = shelf.title || '나의 책장';
+  $('#title').textContent = shelf.title || '나의 책장';
+  $('#owner').textContent = (shelf.owner ? `책장 주인 · ${shelf.owner} · ` : '') + `${data.books.length}권`;
+  $('#updated').textContent = data.updated ? `${data.updated} 업데이트` : '';
+  BOOKS = data.books;
+  if (!BOOKS.length) { $('#shelf').innerHTML = '<p class="empty">아직 꽂힌 책이 없어요.</p>'; return; }
+
+  // 읽은 해로 묶는다. shelf.json 이 이미 최근 순으로 정렬돼 있다
+  const years = [...new Set(BOOKS.map(b => b.year))];
+  $('#shelf').innerHTML = years.map(y => {
+    const list = BOOKS.filter(b => b.year === y);
+    return `<section class="year"><h2>${esc(y)} · ${list.length}권</h2><div class="grid">${
+      list.map(b => `<button class="book" data-id="${b.id}">${coverHtml(b, 'L')}
+        <div class="marks">${b.fav ? '♥' : ''}${b.review || b.quote ? ' 📝' : ''}</div></button>`).join('')
+    }</div></section>`;
+  }).join('');
+}
+
+function openBook(id) {
+  const b = BOOKS.find(x => x.id === id);
+  if (!b) return;
+  const when = `${b.year}년${b.month ? ' ' + b.month + '월' : ''}`;
+  $('#detail').innerHTML = `<div class="detail">
+    <div>${coverHtml(b, 'XL')}</div>
+    <div>
+      <h3>${esc(b.title)}</h3>
+      <div class="meta">${esc([b.author, b.publisher].filter(Boolean).join(' · '))}<br>${esc([when + ' 읽음', b.media, b.category].filter(Boolean).join(' · '))}${b.fav ? ' · <span style="color:var(--accent)">♥ 추천</span>' : ''}</div>
+      ${b.review ? `<p class="review">${esc(b.review)}</p>` : ''}
+      ${b.quote ? `<p class="quote">${esc(b.quote)}</p>` : ''}
+      ${b.link ? `<a href="${esc(b.link)}" target="_blank" rel="noopener">YES24에서 보기 ↗</a>` : ''}
+    </div></div>`;
+  $('#dlg').showModal();
+}
+
+$('#shelf').addEventListener('click', e => { const el = e.target.closest('.book'); if (el) openBook(Number(el.dataset.id)); });
+$('#dlg').addEventListener('click', e => { if (e.target.id === 'dlg') $('#dlg').close(); });   // 바깥을 누르면 닫힘
+
+// 캐시 때문에 게시한 내용이 늦게 보이지 않게 매번 새로 받는다
+fetch('shelf.json?t=' + Date.now()).then(r => r.json()).then(render)
+  .catch(() => { $('#shelf').innerHTML = '<p class="empty">shelf.json 을 읽지 못했어요. 어드민에서 [게시]를 눌렀는지 확인해 주세요.</p>'; });
+</script>
+</body>
+</html>
