@@ -1,0 +1,69 @@
+{
+ "shelf": {
+  "title": "나의 책장",
+  "owner": ""
+ },
+ "updated": "2026-11-22",
+ "books": [
+  {
+   "id": 10,
+   "title": "당신의 독자가 될게요",
+   "author": "정세랑",
+   "publisher": "마음산책",
+   "cover": "https://image.yes24.com/goods/191319962/L",
+   "link": "https://www.yes24.com/product/goods/191319962",
+   "media": "종이책",
+   "year": 2026,
+   "month": 11,
+   "category": "문학",
+   "fav": false,
+   "review": "",
+   "quote": ""
+  },
+  {
+   "id": 7,
+   "title": "Psycho-Cybernetics (Updated and Expanded)",
+   "author": "Maxwell Maltz",
+   "publisher": "Souvenir Press",
+   "cover": "https://image.yes24.com/goods/106670561/L",
+   "link": "https://www.yes24.com/product/goods/106670561",
+   "media": "종이책",
+   "year": 2026,
+   "month": 11,
+   "category": "인문",
+   "fav": false,
+   "review": "",
+   "quote": ""
+  },
+  {
+   "id": 9,
+   "title": "지구에서 한아뿐",
+   "author": "정세랑",
+   "publisher": "난다",
+   "cover": "https://image.yes24.com/goods/76106687/L",
+   "link": "https://www.yes24.com/product/goods/76106687",
+   "media": "종이책",
+   "year": 2025,
+   "month": 11,
+   "category": "문학",
+   "fav": false,
+   "review": "",
+   "quote": ""
+  },
+  {
+   "id": 8,
+   "title": "시선으로부터,",
+   "author": "정세랑",
+   "publisher": "문학동네",
+   "cover": "https://image.yes24.com/goods/90367403/L",
+   "link": "https://www.yes24.com/product/goods/90367403",
+   "media": "종이책",
+   "year": 2025,
+   "month": 11,
+   "category": "문학",
+   "fav": false,
+   "review": "",
+   "quote": ""
+  }
+ ]
+}

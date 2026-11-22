@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>책장 어드민</title>
+<!--
+  나의 책장 · 어드민 쪽 (내 컴퓨터에서만 열린다)
+  책을 찾고, 꽂고, 고치고, [게시]로 사이트 파일(docs/shelf.json)을 만든다.
+  서버(server.py)에 묻는 주소는 다섯 개뿐이다.
+    GET /api/books  내 책 목록     GET /api/search?q=  YES24 검색
+    POST /api/books 꽂기           PUT·DELETE /api/books/번호  고치기·빼기
+    POST /api/publish  게시
+-->
+<style>
+  :root { --bg: #f4f2ec; --card: #fff; --ink: #1d1d1b; --muted: #8a877d; --line: #e3dfd3; --accent: #b0412e; --ok: #2f6b45; --warn: #fff4d6; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14.5px/1.5 -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+  button, input, select, textarea { font: inherit; }
+  .top { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 20px; background: var(--ink); color: #fff; }
+  .top h1 { font-size: 16px; margin: 0 auto 0 0; }
+  .btn { border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 7px; padding: 7px 13px; cursor: pointer; text-decoration: none; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.small { padding: 3px 9px; font-size: 13px; }
+  .badge { font-size: 12.5px; padding: 3px 9px; border-radius: 99px; background: #ffffff22; }
+  .badge.need { background: #f2c94c; color: #222; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 18px 20px 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+  .panel h2 { font-size: 15px; margin: 0 0 12px; }
+  .full { grid-column: 1 / -1; }
+  .notice { background: var(--warn); border: 1px solid #ecd9a0; border-radius: 10px; padding: 12px 16px; }
+  .notice code, .guide code { background: #0000000d; padding: 1px 5px; border-radius: 4px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  input[type=text], input[type=number], select, textarea { border: 1px solid var(--line); border-radius: 7px; padding: 7px 10px; background: #fff; width: 100%; }
+  textarea { min-height: 64px; resize: vertical; }
+  label { display: block; font-size: 12.5px; color: var(--muted); margin: 10px 0 4px; }
+  .muted { color: var(--muted); font-size: 13px; }
+
+  /* 검색 결과 */
+  .results { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 14px; margin-top: 14px; }
+  .result { border: 1px solid transparent; border-radius: 8px; padding: 6px; background: none; text-align: left; cursor: pointer; }
+  .result:hover, .result.on { border-color: var(--accent); background: #b0412e0d; }
+  .result img { width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block; background: #eee; }
+  .result b { display: block; font-size: 13px; margin-top: 6px; line-height: 1.3; }
+  .result span { font-size: 12px; color: var(--muted); }
+
+  /* 입력 폼 */
+  .form { display: grid; grid-template-columns: 120px 1fr; gap: 16px; }
+  .form img, .form .ph { width: 120px; aspect-ratio: 2/3; object-fit: cover; background: #eee; border-radius: 3px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+  /* 내 책 목록 */
+  .list { display: grid; gap: 6px; }
+  .item { display: grid; grid-template-columns: 40px 1fr auto; gap: 12px; align-items: center; padding: 6px; border-radius: 8px; }
+  .item:hover { background: #00000006; }
+  .item img, .item .ph { width: 40px; height: 58px; object-fit: cover; background: #eee; border-radius: 2px; }
+  .item b { font-weight: 600; }
+  .sample { font-size: 11px; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0 4px; margin-left: 4px; }
+  .guide { line-height: 1.7; }
+  .guide pre { background: #1d1d1b; color: #f4f2ec; padding: 12px 14px; border-radius: 8px; overflow-x: auto; font-size: 13px; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; }
+  .toast.show { opacity: 1; }
+  .toast.err { background: var(--accent); }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>📚 책장 어드민</h1>
+  <span class="badge" id="pubState"></span>
+  <a class="btn small" href="/site/" target="_blank">사이트 미리보기 ↗</a>
+  <button class="btn small primary" id="publishBtn">게시</button>
+</div>
+
+<div class="wrap">
+  <div class="full notice" id="keyNotice" hidden>
+    <b>YES24 API 키가 아직 없어요.</b> 책 검색을 하려면 키가 필요해요. 이 폴더의 <code>.env.example</code> 파일을 복사해서 이름을 <code>.env</code>로 바꾸고, 안에 키를 붙여 넣은 뒤 어드민을 껐다 켜 주세요.
+    키는 <a href="https://developers.yes24.com/" target="_blank">developers.yes24.com</a>에서 받아요. 키 없이도 아래 "직접 적기"로 책을 꽂을 수 있어요.
+  </div>
+  <div class="full notice" id="sampleNotice" hidden>
+    지금 꽂혀 있는 책 중 <b><span id="sampleCount"></span>권은 샘플</b>이에요. 내 책을 몇 권 꽂은 뒤 지워 주세요.
+    <button class="btn small" id="clearSamples">샘플 지우기</button>
+  </div>
+
+  <section class="panel">
+    <h2>1. 책 찾기</h2>
+    <div class="row">
+      <input type="text" id="q" placeholder="제목, 저자, ISBN, YES24 상품 주소" style="flex:1">
+      <button class="btn primary" id="searchBtn">찾기</button>
+    </div>
+    <p class="muted">YES24에 없는 책은 <a href="#" id="manualBtn">직접 적기</a>로 꽂을 수 있어요. 표지 대신 제목 카드가 나가요.</p>
+    <div class="results" id="results"></div>
+  </section>
+
+  <section class="panel">
+    <h2 id="formTitle">2. 책장에 꽂기</h2>
+    <div id="formArea"><p class="muted">왼쪽에서 책을 찾아 표지를 누르면 여기에 입력 칸이 열려요.</p></div>
+  </section>
+
+  <section class="panel">
+    <h2>내 책장 <span class="muted" id="count"></span></h2>
+    <div class="row" style="margin-bottom:12px">
+      <input type="text" id="shelfTitle" placeholder="책장 이름" style="flex:2">
+      <input type="text" id="shelfOwner" placeholder="책장 주인 (선택)" style="flex:1.4">
+      <button class="btn small" id="saveShelf">저장</button>
+    </div>
+    <div class="list" id="list"></div>
+  </section>
+
+  <section class="panel guide">
+    <h2>3. 웹에 올리기</h2>
+    <p><b>게시</b>를 누르면 <code>docs/shelf.json</code>이 새로 써져요. 여기까지는 내 컴퓨터 안의 일이에요. <b>사이트 미리보기</b>로 확인한 뒤 GitHub에 올리면 웹에 반영돼요.</p>
+    <p>Claude Code(코덱스)에게 이렇게 말하면 돼요.</p>
+    <pre>책장을 게시했어. 바뀐 파일을 커밋하고 GitHub에 올려줘.
+올리기 전에 .env 파일이 올라가지 않는지 확인해줘.</pre>
+    <p>직접 한다면 터미널에서</p>
+    <pre>git add .
+git commit -m "책장: 새 책"
+git push</pre>
+    <p class="muted">처음 한 번은 저장소를 만들고 GitHub Pages를 켜야 해요. README의 "웹에 처음 올리기"를 봐 주세요. push 하고 1~2분 뒤에 사이트가 바뀌어요.</p>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let STATE = { books: [], categories: [] };
+let found = [];          // 마지막 검색 결과
+let editing = null;      // 고치는 중인 책 번호. null 이면 새로 꽂기
+
+function toast(msg, err) {
+  const t = $('#toast'); t.textContent = msg; t.className = 'toast show' + (err ? ' err' : '');
+  clearTimeout(t._h); t._h = setTimeout(() => t.className = 'toast', err ? 5000 : 2200);
+}
+async function api(path, opt = {}) {
+  const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...opt, body: opt.body ? JSON.stringify(opt.body) : undefined });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error) throw new Error(data.error || '서버 오류 ' + res.status);
+  return data;
+}
+
+// ── 내 책 목록 ──
+async function load() {
+  STATE = await api('/api/books');
+  $('#keyNotice').hidden = STATE.hasKey;
+  const samples = STATE.books.filter(b => b.sample).length;
+  $('#sampleNotice').hidden = !samples; $('#sampleCount').textContent = samples;
+  $('#pubState').textContent = STATE.unpublished ? '게시하지 않은 변경 있음' : '게시됨';
+  $('#pubState').className = 'badge' + (STATE.unpublished ? ' need' : '');
+  $('#count').textContent = STATE.books.length + '권';
+  $('#shelfTitle').value = STATE.shelf?.title || ''; $('#shelfOwner').value = STATE.shelf?.owner || '';
+  const books = [...STATE.books].sort((a, b) => (b.year - a.year) || ((b.month || 0) - (a.month || 0)) || (b.id - a.id));
+  $('#list').innerHTML = books.map(b => `<div class="item">
+      ${b.cover ? `<img src="${esc(b.cover)}" alt="">` : '<div class="ph"></div>'}
+      <div><b>${esc(b.title)}</b>${b.sample ? '<span class="sample">샘플</span>' : ''}${b.fav ? ' <span style="color:var(--accent)">♥</span>' : ''}
+        <div class="muted">${esc([b.author, `${b.year}${b.month ? '.' + b.month : ''}`, b.category].filter(Boolean).join(' · '))}</div></div>
+      <div class="row"><button class="btn small" data-edit="${b.id}">고치기</button><button class="btn small" data-del="${b.id}">빼기</button></div>
+    </div>`).join('') || '<p class="muted">아직 꽂힌 책이 없어요.</p>';
+}
+
+// ── 1. 찾기 ──
+async function search() {
+  const q = $('#q').value.trim(); if (!q) return;
+  $('#results').innerHTML = '<p class="muted">찾는 중…</p>';
+  try {
+    found = (await api('/api/search?q=' + encodeURIComponent(q))).items;
+    $('#results').innerHTML = found.map((it, i) => `<button class="result" data-i="${i}">
+        <img src="${esc(it.cover)}" alt=""><b>${esc(it.title)}</b>
+        <span>${esc(it.author)} · ${esc(it.publisher)}<br>${esc(it.media)} · ${esc((it.publishDate || '').slice(0, 4))}</span></button>`).join('')
+      || '<p class="muted">찾은 책이 없어요. 제목을 짧게 줄이거나 ISBN으로 찾아 보세요.</p>';
+  } catch (e) { $('#results').innerHTML = ''; toast(e.message, true); }
+}
+
+// ── 2. 꽂기·고치기 폼 ──
+function showForm(book, id = null) {
+  editing = id;
+  $('#formTitle').textContent = id ? '고치기' : '2. 책장에 꽂기';
+  const now = new Date();
+  const b = { year: now.getFullYear(), month: now.getMonth() + 1, media: '종이책', ...book };
+  const manual = !b.yes24Id && !id;   // 직접 적는 책은 제목·저자도 고칠 수 있게
+  $('#formArea').innerHTML = `<div class="form">
+    <div>${b.cover ? `<img src="${esc(b.cover)}" alt="">` : '<div class="ph"></div>'}</div>
+    <div>
+      ${manual || !b.yes24Id ? `<label>제목</label><input type="text" id="f_title" value="${esc(b.title || '')}">
+        <label>저자</label><input type="text" id="f_author" value="${esc(b.author || '')}">
+        <label>출판사</label><input type="text" id="f_publisher" value="${esc(b.publisher || '')}">`
+        : `<b style="font-size:16px">${esc(b.title)}</b><div class="muted">${esc(b.author)} · ${esc(b.publisher)} · ${esc(b.media)}</div>`}
+      <div class="grid2">
+        <div><label>읽은 해</label><input type="number" id="f_year" value="${esc(b.year)}"></div>
+        <div><label>읽은 달</label><input type="number" id="f_month" min="0" max="12" value="${esc(b.month || '')}" placeholder="모름"></div>
+        <div><label>분류</label><select id="f_category">${STATE.categories.map(c => `<option ${c === b.category ? 'selected' : ''}>${c}</option>`).join('')}</select></div>
+      </div>
+      <label><input type="checkbox" id="f_fav" ${b.fav ? 'checked' : ''}> ♥ 추천하는 책</label>
+      <label>한줄평</label><textarea id="f_review" placeholder="이 책을 한 문장으로">${esc(b.review || '')}</textarea>
+      <label>좋아하는 구절 (선택)</label><textarea id="f_quote" placeholder="짧게. 책 문장을 길게 옮기면 저작권 문제가 생길 수 있어요">${esc(b.quote || '')}</textarea>
+      <div class="row" style="margin-top:12px">
+        <button class="btn primary" id="saveBook">${id ? '고친 내용 저장' : '책장에 꽂기'}</button>
+        <button class="btn" id="cancelBook">취소</button>
+      </div>
+    </div></div>`;
+  $('#saveBook').onclick = () => saveBook(b);
+  $('#cancelBook').onclick = () => { editing = null; $('#formTitle').textContent = '2. 책장에 꽂기'; $('#formArea').innerHTML = '<p class="muted">왼쪽에서 책을 찾아 표지를 누르면 여기에 입력 칸이 열려요.</p>'; };
+}
+
+async function saveBook(base) {
+  const v = id => $('#' + id)?.value;
+  const body = { ...base, year: v('f_year'), month: v('f_month'), category: v('f_category'),
+    fav: $('#f_fav').checked, review: v('f_review'), quote: v('f_quote') };
+  if ($('#f_title')) Object.assign(body, { title: v('f_title'), author: v('f_author'), publisher: v('f_publisher') });
+  try {
+    if (editing) await api('/api/books/' + editing, { method: 'PUT', body });
+    else await api('/api/books', { method: 'POST', body });
+    toast(editing ? '고쳤어요' : `「${body.title}」을 꽂았어요`);
+    $('#cancelBook').click(); await load();
+  } catch (e) { toast(e.message, true); }
+}
+
+// ── 이벤트 ──
+$('#searchBtn').onclick = search;
+$('#q').onkeydown = e => { if (e.key === 'Enter') search(); };
+$('#manualBtn').onclick = e => { e.preventDefault(); showForm({ title: '', author: '', publisher: '', cover: '' }); };
+$('#results').onclick = e => {
+  const el = e.target.closest('.result'); if (!el) return;
+  document.querySelectorAll('.result').forEach(r => r.classList.toggle('on', r === el));
+  const it = found[Number(el.dataset.i)];
+  showForm({ ...it, category: STATE.categories[0] });
+};
+$('#list').onclick = async e => {
+  const ed = e.target.dataset.edit, del = e.target.dataset.del;
+  if (ed) { const b = STATE.books.find(x => x.id == ed); showForm(b, b.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  if (del) {
+    const b = STATE.books.find(x => x.id == del);
+    if (!confirm(`「${b.title}」을 책장에서 뺄까요?`)) return;
+    await api('/api/books/' + del, { method: 'DELETE' }); toast('뺐어요'); load();
+  }
+};
+$('#saveShelf').onclick = async () => {
+  await api('/api/shelf', { method: 'POST', body: { title: $('#shelfTitle').value, owner: $('#shelfOwner').value } });
+  toast('책장 이름을 저장했어요'); load();
+};
+$('#clearSamples').onclick = async () => {
+  if (!confirm('샘플 책을 모두 뺄까요? 내가 꽂은 책과 고친 샘플은 남아요.')) return;
+  await api('/api/clear-samples', { method: 'POST' }); toast('샘플을 지웠어요'); load();
+};
+$('#publishBtn').onclick = async () => {
+  try {
+    const r = await api('/api/publish', { method: 'POST' });
+    toast(`${r.count}권을 게시했어요. 이제 GitHub에 올리면 웹에 반영돼요`); load();
+  } catch (e) { toast(e.message, true); }
+};
+load().catch(e => toast(e.message, true));
+</script>
+</body>
+</html>

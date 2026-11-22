@@ -1,0 +1,7 @@
+# GitHub 에 올리지 않을 것들
+# .env 에는 YES24 API 키가 들어 있다. 공개 저장소에 올라가면 누구나 내 키를 쓸 수 있다
+.env
+__pycache__/
+*.tmp
+.DS_Store
+Thumbs.db

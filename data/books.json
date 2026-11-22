@@ -1,0 +1,80 @@
+{
+  "shelf": {
+    "title": "나의 책장",
+    "owner": ""
+  },
+  "books": [
+    {
+      "title": "Psycho-Cybernetics (Updated and Expanded)",
+      "author": "Maxwell Maltz",
+      "publisher": "Souvenir Press",
+      "cover": "https://image.yes24.com/goods/106670561/L",
+      "link": "https://www.yes24.com/product/goods/106670561",
+      "yes24Id": 106670561,
+      "isbn13": "9781800812925",
+      "media": "종이책",
+      "year": 2026,
+      "month": 11,
+      "category": "인문",
+      "fav": false,
+      "review": "",
+      "quote": "",
+      "id": 7,
+      "addedAt": "2026-11-22"
+    },
+    {
+      "title": "시선으로부터,",
+      "author": "정세랑",
+      "publisher": "문학동네",
+      "cover": "https://image.yes24.com/goods/90367403/L",
+      "link": "https://www.yes24.com/product/goods/90367403",
+      "yes24Id": 90367403,
+      "isbn13": "9788954672214",
+      "media": "종이책",
+      "year": 2025,
+      "month": 11,
+      "category": "문학",
+      "fav": false,
+      "review": "",
+      "quote": "",
+      "id": 8,
+      "addedAt": "2026-11-22"
+    },
+    {
+      "title": "지구에서 한아뿐",
+      "author": "정세랑",
+      "publisher": "난다",
+      "cover": "https://image.yes24.com/goods/76106687/L",
+      "link": "https://www.yes24.com/product/goods/76106687",
+      "yes24Id": 76106687,
+      "isbn13": "9791188862290",
+      "media": "종이책",
+      "year": 2025,
+      "month": 11,
+      "category": "문학",
+      "fav": false,
+      "review": "",
+      "quote": "",
+      "id": 9,
+      "addedAt": "2026-11-22"
+    },
+    {
+      "title": "당신의 독자가 될게요",
+      "author": "정세랑",
+      "publisher": "마음산책",
+      "cover": "https://image.yes24.com/goods/191319962/L",
+      "link": "https://www.yes24.com/product/goods/191319962",
+      "yes24Id": 191319962,
+      "isbn13": "9788960909960",
+      "media": "종이책",
+      "year": 2026,
+      "month": 11,
+      "category": "문학",
+      "fav": false,
+      "review": "",
+      "quote": "",
+      "id": 10,
+      "addedAt": "2026-11-22"
+    }
+  ]
+}
